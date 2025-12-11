@@ -1,0 +1,8 @@
+vagrant up
+vagrant destroy -f
+vagrant ssh bfiguetS -> exit
+sudo systemctl status k3s --no-pager
+sudo journalctl -xeu k3s --no-pager | tail -50
+vagrant provision bfiguetS
+ssh -o StrictHostKeyChecking=no vagrant@192.168.56.110 'echo OK'
+kubectl get nodes
