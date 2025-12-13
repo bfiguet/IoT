@@ -1,0 +1,36 @@
+#Deployment (the application)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: playground
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: playground
+  template:
+    metadata:
+      labels:
+        app: playground
+    spec:
+      containers:
+        - name: playground
+          image: wil42/playground:v1
+          ports:
+            - containerPort: 8888
+---
+#Service (network exposure)
+apiVersion: v1
+kind: Service
+metadata:
+  name: playground-service
+  namespace: dev
+spec:
+  selector:
+    app: playground
+  ports:
+    - protocol: TCP
+      port: 8888
+      targetPort: 8888
+  type: NodePort  # Expose the app on the k3d cluster and map it to localhost
