@@ -1,4 +1,7 @@
-#Deployment (the application)
+#DEPLOYMENT (the application)
+# A Deployment manages a set of identical Pods.
+# It ensures that the desired number of replicas is always running.
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,8 +22,13 @@ spec:
           image: wil42/playground:v1
           ports:
             - containerPort: 8888
+
 ---
-#Service (network exposure)
+
+#SERVICE (network exposure)
+# A Service exposes the application inside (and outside) the cluster.
+# It provides a stable network endpoint for accessing the Pods.
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -33,4 +41,7 @@ spec:
     - protocol: TCP
       port: 8888
       targetPort: 8888
-  type: NodePort  # Expose the app on the k3d cluster and map it to localhost
+      
+  # NodePort exposes the service on each node's IP at a static port
+  # In k3d, this allows access from the host machine
+  type: NodePort

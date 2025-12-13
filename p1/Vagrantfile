@@ -1,11 +1,13 @@
+SERVER = ENV['USER'] + "S"
+WORKER = ENV['USER'] + "SW"
+
 Vagrant.configure("2") do |config|
-  #config.vm.box = "ubuntu/focal64"
   config.vm.box = "bento/ubuntu-24.04"
 
   # Define a minimal k3s cluster: server and agent
   nodes = {
-    "bfiguetS" => { ip: "192.168.56.110"},
-    "bfiguetSW" => { ip: "192.168.56.111"}
+    "#{SERVER}" => { ip: "192.168.56.110"},
+    "#{WORKER}" => { ip: "192.168.56.111"}
   }
 
   # Loop through nodes to define them
@@ -31,7 +33,7 @@ Vagrant.configure("2") do |config|
   end
 
   # ===== K3S SERVER =====
-  config.vm.define "bfiguetS" do |server|
+  config.vm.define "#{SERVER}" do |server|
     server.vm.provision "shell", inline: <<-SHELL
 	# Install k36s in server mode if not already installed
       if ! systemctl is-active --quiet k3s; then
@@ -49,7 +51,7 @@ Vagrant.configure("2") do |config|
   end
 
   # ===== K3S AGENT =====
-  config.vm.define "bfiguetSW" do |worker|
+  config.vm.define "#{WORKER}" do |worker|
     worker.vm.provision "shell", inline: <<-SHELL
       # Wait until the k3s token file is available
       until [ -f /vagrant/k3s_token ]; do

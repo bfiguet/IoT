@@ -1,0 +1,194 @@
+VM_NAME = ENV['USER'] + "S"
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-24.04"
+
+  # Hostmanager pour mettre à jour le /etc/hosts de l'hôte automatiquement
+  if Vagrant.has_plugin?("vagrant-hostmanager")
+    config.hostmanager.enabled = true
+    config.hostmanager.manage_host = true
+    config.hostmanager.ignore_private_ip = false
+    config.hostmanager.include_offline = true
+    config.hostmanager.aliases = %w[app1.com app2.com app3.com]
+  end
+
+  config.vm.define VM_NAME do |vm|
+    vm.vm.hostname = VM_NAME
+    vm.vm.network "private_network", ip: "192.168.56.110"
+
+    vm.vm.provider "virtualbox" do |vb|
+      vb.memory = 2048
+      vb.cpus = 2
+    end
+
+    vm.vm.provision "shell", inline: <<-SHELL
+      # Install prerequisites
+      sudo apt-get update
+      sudo apt-get install -y curl socat conntrack ipset
+
+      # Install K3s server
+      if ! systemctl is-active --quiet k3s; then
+        curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
+      fi
+
+      # Wait until K3s is ready
+      until kubectl get nodes >/dev/null 2>&1; do
+        sleep 2
+      done
+
+      # Create folder for inline YAMLs
+      mkdir -p /vagrant/k3s-apps
+
+      # App1 deployment + service
+      cat <<EOF >/vagrant/k3s-apps/app1.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app1
+  template:
+    metadata:
+      labels:
+        app: app1
+    spec:
+      containers:
+      - name: app1
+        image: nginx:alpine
+        command: ["sh", "-c", "echo '<h1>App1</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app1
+spec:
+  selector:
+    app: app1
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+EOF
+
+      # App2 deployment + service (3 replicas)
+      cat <<EOF >/vagrant/k3s-apps/app2.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: app2
+  template:
+    metadata:
+      labels:
+        app: app2
+    spec:
+      containers:
+      - name: app2
+        image: nginx:alpine
+        command: ["sh", "-c", "echo '<h1>App2</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2
+spec:
+  selector:
+    app: app2
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+EOF
+
+      # App3 deployment + service (default)
+      cat <<EOF >/vagrant/k3s-apps/app3.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app3
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app3
+  template:
+    metadata:
+      labels:
+        app: app3
+    spec:
+      containers:
+      - name: app3
+        image: nginx:alpine
+        command: ["sh", "-c", "echo '<h1>App3</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
+        ports:
+        - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app3
+spec:
+  selector:
+    app: app3
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+EOF
+
+      # Ingress to route by Host (fallback sans host)
+      cat <<EOF >/vagrant/k3s-apps/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: apps-ingress
+spec:
+  rules:
+  - host: app1.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app1
+            port:
+              number: 80
+  - host: app2.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app2
+            port:
+              number: 80
+  # Fallback par défaut pour tout autre host
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: app3
+            port:
+              number: 80
+EOF
+
+      # Apply all YAMLs
+      kubectl apply -f /vagrant/k3s-apps/
+    SHELL
+  end
+end

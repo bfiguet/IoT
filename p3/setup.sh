@@ -1,47 +1,53 @@
 #!/bin/bash
 set -e
 
-echo "Mise à jour du système..."
+echo "Updating the system..."
 sudo apt-get update -y
 sudo apt-get upgrade -y
 
-echo "Installation des dépendances..."
+echo "Installing required dependencies..."
 sudo apt-get install -y curl wget git apt-transport-https ca-certificates gnupg lsb-release
 
-echo "Installation de Docker..."
+echo "Installing Docker..."
 curl -fsSL https://get.docker.com -o get-docker.sh
 sh get-docker.sh
-sudo usermod -aG docker $USER
-newgrp docker
 
-echo "Installation de k3d..."
+sudo usermod -aG docker $USER
+newgrp docker  # Apply group change immediately (only affects this script session)
+
+echo "Installing k3d..."
 curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
-echo "Installation de kubectl..."
+echo "Installing kubectl..."
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
 sudo mv kubectl /usr/local/bin/
 
-echo "Tous les outils sont installés !"
+echo "All required tools have installed sucessfully!"
 
-echo "Création du cluster K3D..."
+echo "Creating the K3D cluster..."
+# Create a k3d cluster with one agent
+# Expose port 8888 from the agent to localhost
 k3d cluster create moncluster --agents 1 --port "8888:8888@agent[0]"
 
-echo "Cluster créé :"
+echo "Cluster successfully created. Nodes :"
 kubectl get nodes
 
-# Créer un namespace pour Argo CD
+# Create the Argo CD namespace (ignore error if it already exists)
 kubectl create namespace argocd || true
 
-# Installer Argo CD dans ce namespace
+# Install Argo CD in its dedicated namespace
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-echo "Attente que les pods Argo CD soient prêts..."
+echo "Waiting for Argo CD pods to become ready..."
 kubectl wait --for=condition=ready pod -n argocd --all --timeout=180s
 
-echo "Argo CD installé !"
+echo "Argo CD has been successfully installed!"
 
+# Create the development namespace for the application
 kubectl create namespace dev || true
 
+# Deploy the application (Deployment + Service)
 kubectl apply -f deployment.yaml
-echo "Application déployée !"
+
+echo "Application deployed successfully!"
