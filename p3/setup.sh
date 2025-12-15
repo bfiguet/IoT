@@ -28,7 +28,7 @@ echo "All required tools have installed sucessfully!"
 echo "Creating the K3D cluster..."
 # Create a k3d cluster with one agent
 # Expose port 8888 from the agent to localhost
-k3d cluster create moncluster --agents 1 --port "8888:8888@agent[0]"
+k3d cluster create bfiguet --agents 1 --port "8888:8888@agent[0]"
 
 echo "Cluster successfully created. Nodes :"
 kubectl get nodes

@@ -1,0 +1,24 @@
+# Argo CD Application manifest
+# This file tells Argo CD:
+# - where the Git repository is
+# - which Kubernetes manifests to read
+# - where to deploy them in the cluster
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: playground
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: 'https://github.com/bfiguet/IoT.git'
+    targetRevision: master
+    path: p3
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: dev
+  syncPolicy:  # Automated synchronization settings
+    automated:
+      prune: true  # Remove resources that are no longer defined in Git
+      selfHeal: true  # Automatically fix drift if someone modifies resources manually
