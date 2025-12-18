@@ -1,0 +1,33 @@
+global:
+  edition: ce
+  hosts:
+    domain: gitlab.local
+    externalIP: 192.168.56.112
+  ingress:
+    enabled: true
+    class: nginx
+    configureCertmanager: false
+
+  minio:
+    enabled: false
+
+certmanager:
+  enabled: false
+
+sidekiq:
+  enabled: false
+
+postgresql:
+  install: true
+  postgresqlPassword: "gitlab"
+  postgresqlUsername: "gitlab"
+  postgresqlDatabase: "gitlabhq_production"
+
+prometheus:
+  install: false
+
+gitlab-runner:
+  install: false
+
+nginx-ingress:
+  enabled: true

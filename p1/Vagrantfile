@@ -1,68 +1,53 @@
-SERVER = ENV['USER'] + "S"
-WORKER = ENV['USER'] + "SW"
-
 Vagrant.configure("2") do |config|
   config.vm.box = "bento/ubuntu-24.04"
+  # config.vm.box_check_update = false
 
-  # Define a minimal k3s cluster: server and agent
-  nodes = {
-    "#{SERVER}" => { ip: "192.168.56.110"},
-    "#{WORKER}" => { ip: "192.168.56.111"}
-  }
+  config.vm.synced_folder ".", "/vagrant", disabled: true
 
-  # Loop through nodes to define them
-  nodes.each do |name, opts|
-    config.vm.define name do |node|
-      node.vm.hostname = name
-      node.vm.network "private_network", ip: opts[:ip]
-
-      node.vm.provider "virtualbox" do |vb|
-        vb.memory = 2048
-        vb.cpus = 2
-      end
-
-      # Sync folder to share files between host and guest
-      node.vm.synced_folder ".", "/vagrant", type: "virtualbox"
-
-      # Install required utilities for k3s
-      node.vm.provision "shell", inline: <<-SHELL
-        sudo apt-get update
-        sudo apt-get install -y curl socat conntrack ipset
-      SHELL
-    end
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
   end
 
-  # ===== K3S SERVER =====
-  config.vm.define "#{SERVER}" do |server|
-    server.vm.provision "shell", inline: <<-SHELL
-	# Install k36s in server mode if not already installed
-      if ! systemctl is-active --quiet k3s; then
-        curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
-      fi
+  config.vm.provision :shell, inline: <<-SHELL
+    export DEBIAN_FRONTEND=noninteractive
+    apt update
+    apt purge --autoremove -y snap snapd
+    apt upgrade -y
+  SHELL
 
-      # Wait until the server is ready and kubectl works
-      until kubectl get nodes >/dev/null 2>&1; do
-        sleep 2
-      done
+  config.vm.define "vkazanavS" do |config|
+    config.vm.network "private_network", ip: "192.168.56.110"
+    config.vm.network :forwarded_port, guest: 22, host: 2222, id: "ssh", auto_correct: true
 
-      # Share the k3s token with the host for agent nodes
-      cp /var/lib/rancher/k3s/server/token /vagrant/k3s_token
+    config.vm.hostname = "vkazanavS"
+
+    config.vm.provider "virtualbox" do |vb|
+      vb.name = "vkazanavS"
+      vb.cpus = 2
+      vb.memory = "2048"
+    end
+
+    config.vm.provision :shell, inline: <<-SHELL
+      curl -sfL https://get.k3s.io | sh -s - server --write-kubeconfig-mode=644 --token=12345
+      echo "k3s server is up"
     SHELL
   end
 
-  # ===== K3S AGENT =====
-  config.vm.define "#{WORKER}" do |worker|
-    worker.vm.provision "shell", inline: <<-SHELL
-      # Wait until the k3s token file is available
-      until [ -f /vagrant/k3s_token ]; do
-        sleep 2
-      done
+  config.vm.define "vkazanavSW" do |config|
+    config.vm.network "private_network", ip: "192.168.56.111"
+    config.vm.network :forwarded_port, guest: 22, host: 2223, id: "ssh", auto_correct: true
 
-	  # Install k3s in agent mode, connecting to the server
-      curl -sfL https://get.k3s.io | \
-        K3S_URL="https://192.168.56.110:6443" \
-        K3S_TOKEN="$(cat /vagrant/k3s_token)" \
-        sh -
+    config.vm.hostname = "vkazanavSW"
+
+    config.vm.provider "virtualbox" do |vb|
+      vb.name = "vkazanavSW"
+      vb.cpus = 1
+      vb.memory = "1024"
+    end
+
+    config.vm.provision :shell, inline: <<-SHELL
+      curl -sfL https://get.k3s.io | sh -s - agent --server=https://192.168.56.110:6443 --token=12345
+      echo "k3s agent is up"
     SHELL
   end
 end

@@ -1,0 +1,46 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-24.04"  # même que p3
+  config.vm.box_check_update = false
+
+  config.vm.define "bonus" do |bonus|
+    bonus.vm.hostname = "bonus"
+    bonus.vm.network "private_network", ip: "192.168.56.112"
+
+    bonus.vm.network "forwarded_port", guest: 8080, host: 8080   # ArgoCD
+    bonus.vm.network "forwarded_port", guest: 30800, host: 30800 # GitLab
+
+    bonus.vm.provider "virtualbox" do |vb|
+      vb.memory = 4096
+      vb.cpus = 2
+      vb.name = "bonus"
+    end
+
+    bonus.vm.synced_folder "/home/bfiguet/sgoinfre/iot/bonus",
+                          "/home/vagrant/bonus",
+                          type: "virtualbox"
+
+    # Provisioning Docker + k3d + kubectl + helm
+    bonus.vm.provision "shell", inline: <<-SHELL
+      apt-get update -qq
+      apt-get install -y curl wget apt-transport-https ca-certificates gnupg lsb-release
+
+      # Docker
+      curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+      apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io
+
+      # k3d + kubectl + helm
+      curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+      curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+      curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      # Permissions
+      usermod -aG docker vagrant
+      systemctl enable --now docker
+    SHELL
+  end
+end

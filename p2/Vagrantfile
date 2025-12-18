@@ -1,194 +1,71 @@
-VM_NAME = ENV['USER'] + "S"
-
 Vagrant.configure("2") do |config|
   config.vm.box = "bento/ubuntu-24.04"
+  config.vm.box_check_update = false
 
-  # Hostmanager pour mettre à jour le /etc/hosts de l'hôte automatiquement
-  if Vagrant.has_plugin?("vagrant-hostmanager")
-    config.hostmanager.enabled = true
-    config.hostmanager.manage_host = true
-    config.hostmanager.ignore_private_ip = false
-    config.hostmanager.include_offline = true
-    config.hostmanager.aliases = %w[app1.com app2.com app3.com]
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+  config.vm.synced_folder "./conf", "/vagrant/conf"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = true
   end
 
-  config.vm.define VM_NAME do |vm|
-    vm.vm.hostname = VM_NAME
-    vm.vm.network "private_network", ip: "192.168.56.110"
+  config.vm.define "vkazanavS" do |config|
+    config.vm.network "private_network", ip: "192.168.56.110"
 
-    vm.vm.provider "virtualbox" do |vb|
-      vb.memory = 2048
+    config.vm.hostname = "vkazanavS"
+
+    config.vm.provider "virtualbox" do |vb|
+      vb.name = "vkazanavS"
       vb.cpus = 2
+      vb.memory = "2048"
     end
 
-    vm.vm.provision "shell", inline: <<-SHELL
-      # Install prerequisites
-      sudo apt-get update
-      sudo apt-get install -y curl socat conntrack ipset
+    config.vm.provision :shell, inline: <<-SHELL
+      export DEBIAN_FRONTEND=noninteractive
+      apt update
+      apt upgrade -y
+    SHELL
 
-      # Install K3s server
-      if ! systemctl is-active --quiet k3s; then
-        curl -sfL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
-      fi
+    config.vm.provision :shell, inline: <<-SHELL
+      curl -sfL https://get.k3s.io | \
+      sh -s - server \
+        --write-kubeconfig-mode=644 \
+        --token=12345 \
+        --node-ip=192.168.56.110 \
+        --advertise-address=192.168.56.110
 
-      # Wait until K3s is ready
-      until kubectl get nodes >/dev/null 2>&1; do
-        sleep 2
-      done
+      echo "k3s server is up"
+    SHELL
 
-      # Create folder for inline YAMLs
-      mkdir -p /vagrant/k3s-apps
+    config.vm.provision :shell, inline: <<-SHELL
+      echo "deploying deployments"
+      cd /vagrant/conf
+      kubectl apply -f redmine.yaml
+      kubectl apply -f nginx.yaml
+      kubectl apply -f whoami.yaml
+      kubectl apply -f ingres.yaml
 
-      # App1 deployment + service
-      cat <<EOF >/vagrant/k3s-apps/app1.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: app1
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: app1
-  template:
-    metadata:
-      labels:
-        app: app1
-    spec:
-      containers:
-      - name: app1
-        image: nginx:alpine
-        command: ["sh", "-c", "echo '<h1>App1</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
-        ports:
-        - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: app1
-spec:
-  selector:
-    app: app1
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
+      echo "192.168.56.110 app1 app2 app3" >> /etc/hosts
+    SHELL
+
+    config.vm.provision :shell, inline: <<-SHELL
+      apt install -y kubuntu-desktop firefox --no-install-recommends
+
+      PASS='$6$Hp1SeIUZi7Lckwq/$YWaopZpx6/x6UYJ1UmljK8Ang60BBrc7i6df8qbBBSXYyWqLmnud919Y6OGpARgY.6kIANNTQ3JPBArjWwSe31'
+      useradd -m -p "$PASS" -s /bin/bash vaiva
+
+      mkdir -p /etc/sddm.conf.d/
+      cat > /etc/sddm.conf.d/auto-login.conf <<EOF
+[Users]
+HideUsers=vagrant
+
+[Autologin]
+User=vaiva
+Relogin=true
+Session=plasma.desktop
 EOF
 
-      # App2 deployment + service (3 replicas)
-      cat <<EOF >/vagrant/k3s-apps/app2.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: app2
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: app2
-  template:
-    metadata:
-      labels:
-        app: app2
-    spec:
-      containers:
-      - name: app2
-        image: nginx:alpine
-        command: ["sh", "-c", "echo '<h1>App2</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
-        ports:
-        - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: app2
-spec:
-  selector:
-    app: app2
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-EOF
-
-      # App3 deployment + service (default)
-      cat <<EOF >/vagrant/k3s-apps/app3.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: app3
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: app3
-  template:
-    metadata:
-      labels:
-        app: app3
-    spec:
-      containers:
-      - name: app3
-        image: nginx:alpine
-        command: ["sh", "-c", "echo '<h1>App3</h1>' > /usr/share/nginx/html/index.html && nginx -g 'daemon off;'"]
-        ports:
-        - containerPort: 80
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: app3
-spec:
-  selector:
-    app: app3
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 80
-EOF
-
-      # Ingress to route by Host (fallback sans host)
-      cat <<EOF >/vagrant/k3s-apps/ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: apps-ingress
-spec:
-  rules:
-  - host: app1.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: app1
-            port:
-              number: 80
-  - host: app2.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: app2
-            port:
-              number: 80
-  # Fallback par défaut pour tout autre host
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: app3
-            port:
-              number: 80
-EOF
-
-      # Apply all YAMLs
-      kubectl apply -f /vagrant/k3s-apps/
+      service sddm start
     SHELL
   end
 end
