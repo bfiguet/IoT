@@ -1,6 +1,16 @@
-IoT
-• 
+Inception of Things (IoT)
 
-• Le pot a ete recree ou perdu après un déploiement Argo CD qui a mis à jour le pod (passage de v1 → v2).
-Kubernetes crée un nouveau pod pour appliquer le changement (nouvelle image v2). L’ancien pod a été supprimé.
-kubectl port-forward était attaché à l’ancien pod → perdu / non existant. donc il faut relancer la comande
+Inception of Things is a system administration and DevOps oriented project from 42 School.
+The objective is to explore container orchestration by building a small infrastructure using Kubernetes.
+
+The project focuses on learning how to deploy and manage services in a cluster environment using lightweight Kubernetes distributions such as K3s and K3d.
+
+Through this project, we experiment with:
+
+Kubernetes fundamentals
+Cluster setup and configuration
+Deployments and services
+Ingress configuration
+Containerized applications
+Continuous integration concepts
+The infrastructure is built and tested inside a virtual machine, simulating a real DevOps workflow where services are deployed, exposed, and managed within a Kubernetes cluster.
