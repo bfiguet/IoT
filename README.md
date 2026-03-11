@@ -7,8 +7,6 @@ The objective is to understand how to deploy and manage containerized applicatio
 The project is divided into **three mandatory parts** and an **optional bonus**.
 
 
----
-
 # Part 1 – K3s and Vagrant
 
 The goal of this part is to set up a **minimal Kubernetes cluster using K3s** on two virtual machines managed by **Vagrant**.
@@ -149,12 +147,7 @@ Argo CD continuously monitors the repository and synchronizes the cluster automa
 
 ## Application versions
 
-The deployed application has two versions:
-
-```
-v1
-v2
-```
+The deployed application has two versions: v1 & v2
 
 Changing the image tag in the repository automatically updates the running application.
 
@@ -313,11 +306,3 @@ This project introduces several key DevOps concepts:
 * GitOps workflows
 * Continuous deployment
 * Local development clusters
-
----
-
-# Author
-
-Project completed as part of the **42 School curriculum**.
-
-Team: `bfiguet-group`
