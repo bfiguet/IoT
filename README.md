@@ -6,6 +6,32 @@ The objective is to understand how to deploy and manage containerized applicatio
 
 The project is divided into **three mandatory parts** and an **optional bonus**.
 
+---
+
+# Technologies Used
+
+* Kubernetes
+* K3s
+* K3d
+* Docker
+* Vagrant
+* Argo CD
+* GitLab
+* Helm
+
+---
+
+# Learning Objectives
+
+This project introduces several key DevOps concepts:
+
+* Kubernetes cluster management
+* Container orchestration
+* Infrastructure automation
+* GitOps workflows
+* Continuous deployment
+* Local development clusters
+
 
 # Part 1 – K3s and Vagrant
 
@@ -280,29 +306,3 @@ Retrieve Argo CD admin password:
 kubectl -n argocd get secret argocd-initial-admin-secret \
 -o jsonpath="{.data.password}" | base64 -d
 ```
-
----
-
-# Technologies Used
-
-* Kubernetes
-* K3s
-* K3d
-* Docker
-* Vagrant
-* Argo CD
-* GitLab
-* Helm
-
----
-
-# Learning Objectives
-
-This project introduces several key DevOps concepts:
-
-* Kubernetes cluster management
-* Container orchestration
-* Infrastructure automation
-* GitOps workflows
-* Continuous deployment
-* Local development clusters
